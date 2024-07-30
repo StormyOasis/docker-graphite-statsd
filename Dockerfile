@@ -1,10 +1,11 @@
 ARG BASEIMAGE=alpine:3.15
-FROM $BASEIMAGE as base
+FROM $BASEIMAGE AS base
 LABEL maintainer="Denys Zhdanov <denis.zhdanov@gmail.com>"
-LABEL org.opencontainers.image.source https://github.com/graphite-project/docker-graphite-statsd
+LABEL org.opencontainers.image.source=https://github.com/graphite-project/docker-graphite-statsd
 
 RUN true \
  && apk add --update --no-cache \
+      wget \
       cairo \
       cairo-dev \
       findutils \
@@ -40,7 +41,7 @@ RUN apk add --update \
       collectd collectd-disk collectd-nginx collectd-battery\
       || true
 
-FROM base as build
+FROM base AS build
 LABEL maintainer="Denys Zhdanov <denis.zhdanov@gmail.com>"
 
 ARG python_extra_flags="--single-version-externally-managed --root=/"
@@ -86,6 +87,13 @@ RUN true \
       django-cockroachdb==3.2.*
 
 ARG version=1.1.10
+
+# install grafana
+WORKDIR /opt
+RUN wget https://dl.grafana.com/enterprise/release/grafana-enterprise-11.1.3.linux-amd64.tar.gz
+RUN tar -zxvf grafana-enterprise-11.1.3.linux-amd64.tar.gz
+RUN rm -f /opt/grafana-enterprise-11.1.3.linux-amd64.tar.gz
+RUN mv /opt/grafana-v11.1.3 /opt/grafana
 
 # install whisper
 ARG whisper_version=${version}
@@ -157,10 +165,10 @@ RUN mkdir -p /var/log/graphite/ \
 # config statsd
 COPY conf/opt/statsd/config/ /opt/defaultconf/statsd/config/
 
-FROM base as production
+FROM base AS production
 LABEL maintainer="Denys Zhdanov <denis.zhdanov@gmail.com>"
 
-ENV STATSD_INTERFACE udp
+ENV STATSD_INTERFACE=udp
 
 # copy config BEFORE build
 COPY conf /
@@ -169,7 +177,7 @@ COPY conf /
 COPY --from=build /opt /opt
 
 # defaults
-EXPOSE 80 2003-2004 2013-2014 2023-2024 8080 8125 8125/udp 8126
+EXPOSE 80 81 3000 3001 2003-2004 2013-2014 2023-2024 8080 8125 8125/udp 8126
 VOLUME ["/opt/graphite/conf", "/opt/graphite/storage", "/opt/graphite/webapp/graphite/functions/custom", "/etc/nginx", "/opt/statsd/config", "/etc/logrotate.d", "/var/log", "/var/lib/redis"]
 
 STOPSIGNAL SIGHUP
